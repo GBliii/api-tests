@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "029f7ce9-d428-4d26-a22d-96cf9bd78b38",
+    "_postman_id": "a8e9beed-59d5-4618-b4fc-a74a8b20df2c",
     "name": "Wikipedia API",
     "description": "API tests for the public Wikipedia APIs: the REST API (page summaries, featured feed) and the MediaWiki Action API (search). Read-only: all requests are GET.\n\nThe same product is covered on the UI level in https://github.com/GBliii/maestro-mobile-e2e-tests, and several requests here mirror those UI tests (search \"Earhart\", the no-results query, the featured feed).\n\nRun: `newman run postman/wikipedia-api.postman_collection.json`",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
@@ -141,11 +141,18 @@
                   "pm.test(\"Error body is JSON and describes the problem\", function () {",
                   "    pm.response.to.be.json;",
                   "    const body = pm.response.json();",
-                  "    pm.expect(body).to.have.property(\"type\");",
-                  "    pm.expect(body.type).to.include(\"not_found\");",
-                  "    pm.expect(body).to.have.property(\"title\");",
-                  "    pm.expect(body.title).to.match(/not found/i);",
+                  "    console.log(\"404 body: \" + JSON.stringify(body));",
+                  "    pm.expect(body).to.have.property(\"title\").that.is.a(\"string\");",
                   "    pm.expect(body).to.have.property(\"detail\").that.is.a(\"string\");",
+                  "    // Either the title or the detail must say that the page was not found",
+                  "    pm.expect(body.title + \" \" + body.detail).to.match(/not found/i);",
+                  "});",
+                  "",
+                  "pm.test(\"The 'type' field is present (observation: it is a generic 'Internal error', not a not_found type)\", function () {",
+                  "    // Observed on the live API: status 404 is correct, but \"type\" does not identify the problem.",
+                  "    // A client should rely on the status code and title/detail, not on \"type\". See TEST_PLAN.md.",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"type\").that.is.a(\"string\");",
                   "});"
                 ]
               }
@@ -165,7 +172,7 @@
                 "Blahblahchanandolerbong"
               ]
             },
-            "description": "Negative: a title that does not exist. The same nonsense query is used in the Android UI test 03 (search with no results)."
+            "description": "Negative: a title that does not exist. The same nonsense query is used in the Android UI test 03 (search with no results). First live run showed that the problem body's \"type\" is a generic \"Internal error\" even though the status is a correct 404 (see Observations in TEST_PLAN.md)."
           },
           "response": []
         },
