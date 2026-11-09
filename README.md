@@ -16,7 +16,7 @@ A portfolio project: request chaining, JSON schema validation, negative testing,
 | # | Request | Checks | Type |
 |---|---------|--------|------|
 | W01 | `GET /page/summary/Amelia_Earhart` | 200, JSON, schema, `type=standard`, title, language, extract, description, desktop URL | positive |
-| W02 | `GET /page/summary/<nonsense>` | 404, JSON problem body: title/detail say "not found"; `type` present (generic, see Observations) | negative |
+| W02 | `GET /page/summary/<nonsense>` | 404; JSON body repeats the status; `type` is a generic "Internal error" (observed, see Observations) | negative |
 | W03 | `GET /page/summary/USA` (redirect) | 302 followed → 200, canonical title `United_States` | positive |
 | W04 | `GET /page/summary/Alien_(film)` | 200, parentheses preserved in the title | positive, special characters |
 | W05 | `GET /feed/featured/{today}` | 200, `tfa` (featured article) present and well-formed, `onthisday` not empty | positive, dynamic data |
@@ -114,8 +114,8 @@ Restful Booker is a practice API and some of its answers are deliberately unconv
 Wikipedia:
 
 - The MediaWiki **Action API reports errors with HTTP 200** and an `error` object in the body; a client that only checks the status code will miss them.
-- The REST API answers **404 with a problem+json body** (`type`, `title`, `detail`) for unknown pages, and **302** for redirect pages (clients normally follow it).
-- In that 404 body the **`type` field is a generic `"Internal error"`**, although the status code is a correct 404 and `title`/`detail` describe the problem. Found on the first live run: the original assertion expected a `not_found` type. A client should rely on the status code and the human-readable fields, not on `type`.
+- The REST API answers **404** for unknown pages and **302** for redirect pages (clients normally follow the redirect).
+- For an unknown page the **404 body is only `{"status": 404, "type": "Internal error"}`**: the status code is correct, but there is no human-readable description and the `type` is misleading (nothing failed on the server). Found on the first live run: the original assertion expected a problem+json body with a `not_found` type and a `title`/`detail`. A client should rely on the status code, not on the body.
 - Wikimedia asks API clients to identify themselves; the collection sends an `Api-User-Agent` header from a collection-level pre-request script.
 
 ## Roadmap

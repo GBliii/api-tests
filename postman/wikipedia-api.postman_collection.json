@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "a8e9beed-59d5-4618-b4fc-a74a8b20df2c",
+    "_postman_id": "a9476ebc-b5b2-4673-9428-eb6d9f67e414",
     "name": "Wikipedia API",
     "description": "API tests for the public Wikipedia APIs: the REST API (page summaries, featured feed) and the MediaWiki Action API (search). Read-only: all requests are GET.\n\nThe same product is covered on the UI level in https://github.com/GBliii/maestro-mobile-e2e-tests, and several requests here mirror those UI tests (search \"Earhart\", the no-results query, the featured feed).\n\nRun: `newman run postman/wikipedia-api.postman_collection.json`",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
@@ -138,21 +138,19 @@
                   "    pm.response.to.have.status(404);",
                   "});",
                   "",
-                  "pm.test(\"Error body is JSON and describes the problem\", function () {",
+                  "pm.test(\"Error body is JSON and repeats the status\", function () {",
                   "    pm.response.to.be.json;",
                   "    const body = pm.response.json();",
                   "    console.log(\"404 body: \" + JSON.stringify(body));",
-                  "    pm.expect(body).to.have.property(\"title\").that.is.a(\"string\");",
-                  "    pm.expect(body).to.have.property(\"detail\").that.is.a(\"string\");",
-                  "    // Either the title or the detail must say that the page was not found",
-                  "    pm.expect(body.title + \" \" + body.detail).to.match(/not found/i);",
+                  "    pm.expect(body).to.have.property(\"status\", 404);",
+                  "    pm.expect(body).to.have.property(\"type\").that.is.a(\"string\").and.is.not.empty;",
                   "});",
                   "",
-                  "pm.test(\"The 'type' field is present (observation: it is a generic 'Internal error', not a not_found type)\", function () {",
-                  "    // Observed on the live API: status 404 is correct, but \"type\" does not identify the problem.",
-                  "    // A client should rely on the status code and title/detail, not on \"type\". See TEST_PLAN.md.",
+                  "pm.test(\"Observed: the body has no human-readable description (type is a generic 'Internal error')\", function () {",
+                  "    // The status code is right; the body is not helpful. A problem+json body with title/detail",
+                  "    // would be the conventional answer. Asserted so that a change in this behaviour is noticed.",
                   "    const body = pm.response.json();",
-                  "    pm.expect(body).to.have.property(\"type\").that.is.a(\"string\");",
+                  "    pm.expect(body.type).to.eql(\"Internal error\");",
                   "});"
                 ]
               }
@@ -172,7 +170,7 @@
                 "Blahblahchanandolerbong"
               ]
             },
-            "description": "Negative: a title that does not exist. The same nonsense query is used in the Android UI test 03 (search with no results). First live run showed that the problem body's \"type\" is a generic \"Internal error\" even though the status is a correct 404 (see Observations in TEST_PLAN.md)."
+            "description": "Negative: a title that does not exist. The same nonsense query is used in the Android UI test 03 (search with no results). Observed on the live API: the body is only {\"status\": 404, \"type\": \"Internal error\"} - a correct status code, but no title/detail and a misleading type (see Observations in TEST_PLAN.md)."
           },
           "response": []
         },
