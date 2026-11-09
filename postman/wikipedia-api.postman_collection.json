@@ -1,0 +1,700 @@
+{
+  "info": {
+    "_postman_id": "029f7ce9-d428-4d26-a22d-96cf9bd78b38",
+    "name": "Wikipedia API",
+    "description": "API tests for the public Wikipedia APIs: the REST API (page summaries, featured feed) and the MediaWiki Action API (search). Read-only: all requests are GET.\n\nThe same product is covered on the UI level in https://github.com/GBliii/maestro-mobile-e2e-tests, and several requests here mirror those UI tests (search \"Earhart\", the no-results query, the featured feed).\n\nRun: `newman run postman/wikipedia-api.postman_collection.json`",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Wikimedia asks API clients to identify themselves; Api-User-Agent is the header for clients that cannot set User-Agent",
+          "pm.request.headers.upsert({ key: \"Api-User-Agent\", value: \"api-tests-portfolio/1.0 (https://github.com/GBliii/api-tests)\" });"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Runs after every request in the collection",
+          "pm.test(\"Response time is under 8 seconds\", function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(8000);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "restBase",
+      "value": "https://en.wikipedia.org/api/rest_v1",
+      "type": "string"
+    },
+    {
+      "key": "actionBase",
+      "value": "https://en.wikipedia.org",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "REST API - page summary",
+      "description": "GET /page/summary/{title}: positive, negative (404), redirect, special characters.",
+      "item": [
+        {
+          "name": "Summary of an existing article",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response is JSON\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"Summary has the required fields with the right types\", function () {",
+                  "    const schema = {",
+                  "        type: \"object\",",
+                  "        required: [\"type\", \"title\", \"pageid\", \"lang\", \"extract\", \"content_urls\"],",
+                  "        properties: {",
+                  "            type: { type: \"string\" },",
+                  "            title: { type: \"string\" },",
+                  "            pageid: { type: \"integer\" },",
+                  "            lang: { type: \"string\" },",
+                  "            extract: { type: \"string\" },",
+                  "            description: { type: \"string\" },",
+                  "            content_urls: {",
+                  "                type: \"object\",",
+                  "                required: [\"desktop\", \"mobile\"],",
+                  "                properties: {",
+                  "                    desktop: { type: \"object\", required: [\"page\"], properties: { page: { type: \"string\" } } },",
+                  "                    mobile: { type: \"object\", required: [\"page\"], properties: { page: { type: \"string\" } } }",
+                  "                }",
+                  "            }",
+                  "        }",
+                  "    };",
+                  "    pm.response.to.have.jsonSchema(schema);",
+                  "});",
+                  "",
+                  "pm.test(\"It is a standard article about Amelia Earhart\", function () {",
+                  "    pm.expect(body.type).to.eql(\"standard\");",
+                  "    pm.expect(body.title).to.eql(\"Amelia Earhart\");",
+                  "    pm.expect(body.lang).to.eql(\"en\");",
+                  "    pm.expect(body.extract).to.include(\"Earhart\");",
+                  "});",
+                  "",
+                  "pm.test(\"Short description is the text the mobile app shows in search results\", function () {",
+                  "    // The Android UI test (04-save-article) asserts \"American aviation pioneer.*\" on this very text",
+                  "    pm.expect(body.description).to.match(/^American aviation pioneer/);",
+                  "});",
+                  "",
+                  "pm.test(\"Desktop page URL points to the article\", function () {",
+                  "    pm.expect(body.content_urls.desktop.page).to.eql(\"https://en.wikipedia.org/wiki/Amelia_Earhart\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{restBase}}/page/summary/Amelia_Earhart",
+              "host": [
+                "{{restBase}}"
+              ],
+              "path": [
+                "page",
+                "summary",
+                "Amelia_Earhart"
+              ]
+            },
+            "description": "Positive: the page summary of a well-known article. The same article is opened by the Android UI tests in maestro-mobile-e2e-tests."
+          },
+          "response": []
+        },
+        {
+          "name": "Summary of a non-existent article returns 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test(\"Error body is JSON and describes the problem\", function () {",
+                  "    pm.response.to.be.json;",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"type\");",
+                  "    pm.expect(body.type).to.include(\"not_found\");",
+                  "    pm.expect(body).to.have.property(\"title\");",
+                  "    pm.expect(body.title).to.match(/not found/i);",
+                  "    pm.expect(body).to.have.property(\"detail\").that.is.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{restBase}}/page/summary/Blahblahchanandolerbong",
+              "host": [
+                "{{restBase}}"
+              ],
+              "path": [
+                "page",
+                "summary",
+                "Blahblahchanandolerbong"
+              ]
+            },
+            "description": "Negative: a title that does not exist. The same nonsense query is used in the Android UI test 03 (search with no results)."
+          },
+          "response": []
+        },
+        {
+          "name": "Redirect page resolves to the target article",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 after the redirect has been followed\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"The summary is the redirect target, United States\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.title).to.eql(\"United States\");",
+                  "    pm.expect(body.titles.canonical).to.eql(\"United_States\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{restBase}}/page/summary/USA",
+              "host": [
+                "{{restBase}}"
+              ],
+              "path": [
+                "page",
+                "summary",
+                "USA"
+              ]
+            },
+            "description": "\"USA\" is a redirect to \"United States\". The API answers 302; Postman/Newman follow it automatically, so the test sees the final 200 and checks that the canonical title is the target article. (To see the 302 itself, turn off \"Automatically follow redirects\" in Postman settings or run Newman with --ignore-redirects.)"
+          },
+          "response": []
+        },
+        {
+          "name": "Title with parentheses is handled",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Title keeps its parentheses and the article is about a film\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.title).to.eql(\"Alien (film)\");",
+                  "    pm.expect(body.titles.normalized).to.eql(\"Alien (film)\");",
+                  "    pm.expect(body.description.toLowerCase()).to.include(\"film\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{restBase}}/page/summary/Alien_(film)",
+              "host": [
+                "{{restBase}}"
+              ],
+              "path": [
+                "page",
+                "summary",
+                "Alien_(film)"
+              ]
+            },
+            "description": "Titles with special characters: in the UI project such a title had to be regex-escaped before it could be used as a selector; here it only has to be URL-safe."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "REST API - featured feed",
+      "description": "GET /feed/featured/{yyyy}/{mm}/{dd}: dynamic date, invalid date.",
+      "item": [
+        {
+          "name": "Today's featured content",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Build today's date in UTC as yyyy / mm / dd",
+                  "const now = new Date();",
+                  "const pad = function (n) { return String(n).padStart(2, \"0\"); };",
+                  "pm.variables.set(\"yyyy\", String(now.getUTCFullYear()));",
+                  "pm.variables.set(\"mm\", pad(now.getUTCMonth() + 1));",
+                  "pm.variables.set(\"dd\", pad(now.getUTCDate()));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.response.to.be.json;",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"Feed contains today's featured article (tfa)\", function () {",
+                  "    pm.expect(body).to.have.property(\"tfa\");",
+                  "    pm.expect(body.tfa.title).to.be.a(\"string\").that.is.not.empty;",
+                  "    pm.expect(body.tfa).to.have.property(\"normalizedtitle\");",
+                  "    pm.expect(body.tfa.extract).to.be.a(\"string\").that.is.not.empty;",
+                  "    pm.expect(body.tfa.type).to.eql(\"standard\");",
+                  "});",
+                  "",
+                  "pm.test(\"Feed contains 'On this day' events\", function () {",
+                  "    pm.expect(body.onthisday).to.be.an(\"array\").that.is.not.empty;",
+                  "    pm.expect(body.onthisday[0]).to.have.property(\"text\");",
+                  "    pm.expect(body.onthisday[0]).to.have.property(\"year\");",
+                  "});",
+                  "",
+                  "console.log(\"Featured article today: \" + body.tfa.normalizedtitle);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{restBase}}/feed/featured/{{yyyy}}/{{mm}}/{{dd}}",
+              "host": [
+                "{{restBase}}"
+              ],
+              "path": [
+                "feed",
+                "featured",
+                "{{yyyy}}",
+                "{{mm}}",
+                "{{dd}}"
+              ]
+            },
+            "description": "Dynamic data: the date is computed in a pre-request script (UTC), the same idea as scripts/today.js in the Maestro project. The Android UI test 05 checks the same feed on the device."
+          },
+          "response": []
+        },
+        {
+          "name": "Invalid date is rejected with a client error",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is a 4xx client error\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400, 404]);",
+                  "});",
+                  "",
+                  "pm.test(\"Error body is JSON with a problem type\", function () {",
+                  "    pm.response.to.be.json;",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"type\").that.is.a(\"string\");",
+                  "    pm.expect(body).to.have.property(\"title\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{restBase}}/feed/featured/2026/13/45",
+              "host": [
+                "{{restBase}}"
+              ],
+              "path": [
+                "feed",
+                "featured",
+                "2026",
+                "13",
+                "45"
+              ]
+            },
+            "description": "Negative: month 13, day 45. The API must answer with a 4xx client error (not a 500) and a JSON problem body."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Action API - search",
+      "description": "GET {{actionBase}}/w/api.php?action=query&list=search and action=opensearch: positive, no results, suggestions, error handling.",
+      "item": [
+        {
+          "name": "Search finds the article",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.response.to.be.json;",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"Batch is complete and there are hits\", function () {",
+                  "    pm.expect(body.batchcomplete).to.eql(true);",
+                  "    pm.expect(body.query.searchinfo.totalhits).to.be.above(0);",
+                  "});",
+                  "",
+                  "pm.test(\"srlimit=5 returns exactly 5 results\", function () {",
+                  "    pm.expect(body.query.search).to.be.an(\"array\").with.lengthOf(5);",
+                  "});",
+                  "",
+                  "pm.test(\"Every result has a numeric pageid, a title and a snippet\", function () {",
+                  "    body.query.search.forEach(function (item) {",
+                  "        pm.expect(item.pageid).to.be.a(\"number\");",
+                  "        pm.expect(item.title).to.be.a(\"string\").that.is.not.empty;",
+                  "        pm.expect(item).to.have.property(\"snippet\");",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test(\"'Amelia Earhart' is among the results\", function () {",
+                  "    const titles = body.query.search.map(function (item) { return item.title; });",
+                  "    pm.expect(titles).to.include(\"Amelia Earhart\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{actionBase}}/w/api.php?action=query&list=search&srsearch=Earhart&srlimit=5&format=json&formatversion=2",
+              "host": [
+                "{{actionBase}}"
+              ],
+              "path": [
+                "w",
+                "api.php"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "query"
+                },
+                {
+                  "key": "list",
+                  "value": "search"
+                },
+                {
+                  "key": "srsearch",
+                  "value": "Earhart"
+                },
+                {
+                  "key": "srlimit",
+                  "value": "5"
+                },
+                {
+                  "key": "format",
+                  "value": "json"
+                },
+                {
+                  "key": "formatversion",
+                  "value": "2"
+                }
+              ]
+            },
+            "description": "Full-text search through the MediaWiki Action API. Mirrors the Android UI test 02 (search \"Earhart\", expect \"Amelia Earhart\")."
+          },
+          "response": []
+        },
+        {
+          "name": "Search with no results",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200: no results is a valid answer, not an error\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Zero hits and an empty result list\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.query.searchinfo.totalhits).to.eql(0);",
+                  "    pm.expect(body.query.search).to.be.an(\"array\").that.is.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{actionBase}}/w/api.php?action=query&list=search&srsearch=blahblahchanandolerbong&format=json&formatversion=2",
+              "host": [
+                "{{actionBase}}"
+              ],
+              "path": [
+                "w",
+                "api.php"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "query"
+                },
+                {
+                  "key": "list",
+                  "value": "search"
+                },
+                {
+                  "key": "srsearch",
+                  "value": "blahblahchanandolerbong"
+                },
+                {
+                  "key": "format",
+                  "value": "json"
+                },
+                {
+                  "key": "formatversion",
+                  "value": "2"
+                }
+              ]
+            },
+            "description": "Negative: a meaningless query. Mirrors the Android UI test 03: zero hits and an empty list, still HTTP 200 (no results is not an error)."
+          },
+          "response": []
+        },
+        {
+          "name": "OpenSearch title suggestions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.response.to.be.json;",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"Response is an array of four arrays: query, titles, descriptions, URLs\", function () {",
+                  "    pm.expect(body).to.be.an(\"array\").with.lengthOf(4);",
+                  "    pm.expect(body[0]).to.eql(\"Amelia Ea\");",
+                  "    pm.expect(body[1]).to.be.an(\"array\");",
+                  "    pm.expect(body[3]).to.be.an(\"array\").with.lengthOf(body[1].length);",
+                  "});",
+                  "",
+                  "pm.test(\"At most 3 suggestions, including Amelia Earhart\", function () {",
+                  "    pm.expect(body[1].length).to.be.at.most(3);",
+                  "    pm.expect(body[1]).to.include(\"Amelia Earhart\");",
+                  "});",
+                  "",
+                  "pm.test(\"Every URL points to an en.wikipedia.org article\", function () {",
+                  "    body[3].forEach(function (link) {",
+                  "        pm.expect(link).to.match(/^https:\\/\\/en\\.wikipedia\\.org\\/wiki\\//);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{actionBase}}/w/api.php?action=opensearch&search=Amelia Ea&limit=3&format=json",
+              "host": [
+                "{{actionBase}}"
+              ],
+              "path": [
+                "w",
+                "api.php"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "opensearch"
+                },
+                {
+                  "key": "search",
+                  "value": "Amelia Ea"
+                },
+                {
+                  "key": "limit",
+                  "value": "3"
+                },
+                {
+                  "key": "format",
+                  "value": "json"
+                }
+              ]
+            },
+            "description": "Prefix suggestions (what the search box shows while typing). The response is an array of four arrays: the query, titles, descriptions, URLs."
+          },
+          "response": []
+        },
+        {
+          "name": "Unknown action returns an error object (with HTTP 200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 (the Action API reports errors in the body)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Body has an error object with a code and a message about 'action'\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"error\");",
+                  "    pm.expect(body.error.code).to.be.oneOf([\"badvalue\", \"unknown_action\"]);",
+                  "    pm.expect(body.error.info).to.include(\"action\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{actionBase}}/w/api.php?action=nonsense&format=json&formatversion=2",
+              "host": [
+                "{{actionBase}}"
+              ],
+              "path": [
+                "w",
+                "api.php"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "nonsense"
+                },
+                {
+                  "key": "format",
+                  "value": "json"
+                },
+                {
+                  "key": "formatversion",
+                  "value": "2"
+                }
+              ]
+            },
+            "description": "Negative. API design observation: the Action API reports errors in the body and keeps HTTP 200, so a client must check the \"error\" object, not only the status code."
+          },
+          "response": []
+        },
+        {
+          "name": "Missing required parameter returns an error object",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200 (the Action API reports errors in the body)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Error names the missing parameter srsearch\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"error\");",
+                  "    pm.expect(body.error.code).to.be.oneOf([\"missingparam\", \"nosrsearch\"]);",
+                  "    pm.expect(body.error.info).to.include(\"srsearch\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{actionBase}}/w/api.php?action=query&list=search&format=json&formatversion=2",
+              "host": [
+                "{{actionBase}}"
+              ],
+              "path": [
+                "w",
+                "api.php"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "query"
+                },
+                {
+                  "key": "list",
+                  "value": "search"
+                },
+                {
+                  "key": "format",
+                  "value": "json"
+                },
+                {
+                  "key": "formatversion",
+                  "value": "2"
+                }
+              ]
+            },
+            "description": "Negative: list=search without srsearch."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

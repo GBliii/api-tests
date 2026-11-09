@@ -1,0 +1,56 @@
+name: API tests
+
+# When this workflow runs:
+#   - on every push to main and on every pull request
+#   - manually from the Actions tab ("Run workflow")
+# To also run it on a schedule (for example every day at 06:00 UTC), add:
+#   schedule:
+#     - cron: "0 6 * * *"
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+  pull_request:
+  workflow_dispatch:
+
+# The workflow only reads the repository
+permissions:
+  contents: read
+
+jobs:
+  newman:
+    # One job per collection; both run in parallel and one failing does not cancel the other
+    name: ${{ matrix.suite }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [wikipedia-api, restful-booker]
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` installs exactly the versions from package-lock.json (Newman + the HTML reporter)
+      - name: Install Newman
+        run: npm ci
+
+      - name: Run the ${{ matrix.suite }} collection
+        run: npm run test:${{ matrix.suite }}
+
+      # Whatever the result, keep the JUnit XML and the HTML report
+      - name: Upload the reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: newman-report-${{ matrix.suite }}
+          path: reports/
+          if-no-files-found: ignore

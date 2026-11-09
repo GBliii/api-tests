@@ -1,0 +1,18 @@
+{
+  "name": "api-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "API tests for the Wikipedia APIs and Restful Booker: Postman collections run with Newman",
+  "scripts": {
+    "test": "npm run test:wikipedia-api && npm run test:restful-booker",
+    "test:wikipedia-api": "mkdir -p reports && newman run postman/wikipedia-api.postman_collection.json -r cli,junit,htmlextra --reporter-junit-export reports/wikipedia-api.xml --reporter-htmlextra-export reports/wikipedia-api.html --reporter-htmlextra-title \"Wikipedia API\"",
+    "test:restful-booker": "mkdir -p reports && newman run postman/restful-booker.postman_collection.json -e postman/restful-booker.postman_environment.json -r cli,junit,htmlextra --reporter-junit-export reports/restful-booker.xml --reporter-htmlextra-export reports/restful-booker.html --reporter-htmlextra-title \"Restful Booker\""
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "newman": "^6.2.3",
+    "newman-reporter-htmlextra": "^1.23.1"
+  }
+}

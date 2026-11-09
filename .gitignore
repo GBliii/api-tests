@@ -1,0 +1,10 @@
+# Installed packages (restored with `npm ci`)
+node_modules/
+
+# Newman reports are generated on every run
+reports/
+
+# macOS / IDE
+.DS_Store
+.idea/
+.vscode/
